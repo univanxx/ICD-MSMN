@@ -1,19 +1,15 @@
 import re
-from random import sample
-import h5py
 import gensim
 import torch
 import os
 from torch.utils.data import Dataset
-from constant import DATA_DIR, MIMIC_2_DIR, MIMIC_3_DIR
+from constant import MIMIC_4_SAVE_DIR
 import sys
-import pandas as pd
 import numpy as np
-import math
 import csv
 from collections import defaultdict
 import warnings
-import json, ujson
+import ujson
 warnings.filterwarnings('ignore', category=FutureWarning)
 
 maxInt = sys.maxsize
@@ -40,15 +36,16 @@ class MimicFullDataset(Dataset):
         self.version = version
         self.mode = mode
 
-        if version == 'mimic2':
-            raise NotImplementedError
-        if version in ['mimic3', 'mimic3-50']:
-            self.path = os.path.join(MIMIC_3_DIR, f"{version}_{mode}.json")
+        # if version == 'mimic2':
+        #     raise NotImplementedError
+        # if version in ['mimic3', 'mimic3-50']:
+        #     self.path = os.path.join(MIMIC_3_DIR, f"{version}_{mode}.json")
+        self.path = os.path.join(MIMIC_4_SAVE_DIR, f"{version}_{mode}.json")
 
-        if version in ['mimic3']:
-            self.train_path = os.path.join(MIMIC_3_DIR, "train_full.csv")
-        if version in ['mimic3-50']:
-            self.train_path = os.path.join(MIMIC_3_DIR, "train_50.csv")
+        # if version in ['mimic3']:
+        #     self.train_path = os.path.join(MIMIC_3_DIR, "train_full.csv")
+        # if version in ['mimic3-50']:
+        self.train_path = os.path.join(MIMIC_4_SAVE_DIR, "train_50.csv")
 
         with open(self.path, "r") as f:
             self.df = ujson.load(f)
@@ -58,7 +55,7 @@ class MimicFullDataset(Dataset):
 
         self.truncate_length = truncate_length
 
-        self.ind2c, _ = load_full_codes(self.train_path, version=version)
+        self.ind2c = load_full_codes(self.train_path, version=version)
         # self.part_icd_codes = list(self.ind2c.values())
         self.c2ind = {c: ind for ind, c in self.ind2c.items()}
         self.code_count = len(self.ind2c)
@@ -287,7 +284,7 @@ def load_vocab(path):
     return word2id, id2word
 
 
-def load_full_codes(train_path, version='mimic3'):
+def load_full_codes(train_path, version='mimic4'):
     """
         Inputs:
             train_path: path to train dataset
@@ -296,31 +293,31 @@ def load_full_codes(train_path, version='mimic3'):
             code lookup, description lookup
     """
     # get description lookup
-    desc_dict = load_code_descriptions(version=version)
+    # desc_dict = load_code_descriptions(version=version)
     # build code lookups from appropriate datasets
-    if version == 'mimic2':
-        ind2c = defaultdict(str)
-        codes = set()
-        with open('%s/proc_dsums.csv' % MIMIC_2_DIR, 'r') as f:
-            r = csv.reader(f)
-            # header
-            next(r)
-            for row in r:
-                codes.update(set(row[-1].split(';')))
-        codes = set([c for c in codes if c != ''])
-        ind2c = defaultdict(str, {i: c for i, c in enumerate(sorted(codes))})
-    else:
-        codes = set()
-        for split in ['train', 'dev', 'test']:
-            with open(train_path.replace('train', split), 'r') as f:
-                lr = csv.reader(f)
-                next(lr)
-                for row in lr:
-                    for code in row[3].split(';'):
-                        codes.add(code)
-        codes = set([c for c in codes if c != ''])
-        ind2c = defaultdict(str, {i: c for i, c in enumerate(sorted(codes))})
-    return ind2c, desc_dict
+    # if version == 'mimic2':
+    #     ind2c = defaultdict(str)
+    #     codes = set()
+    #     with open('%s/proc_dsums.csv' % MIMIC_2_DIR, 'r') as f:
+    #         r = csv.reader(f)
+    #         # header
+    #         next(r)
+    #         for row in r:
+    #             codes.update(set(row[-1].split(';')))
+    #     codes = set([c for c in codes if c != ''])
+    #     ind2c = defaultdict(str, {i: c for i, c in enumerate(sorted(codes))})
+    # else:
+    codes = set()
+    for split in ['train', 'dev', 'test']:
+        with open(train_path.replace('train', split), 'r') as f:
+            lr = csv.reader(f)
+            next(lr)
+            for row in lr:
+                for code in row[3].split(';'):
+                    codes.add(code)
+    codes = set([c for c in codes if c != ''])
+    ind2c = defaultdict(str, {i: c for i, c in enumerate(sorted(codes))})
+    return ind2c #, desc_dict
 
 
 def reformat(code, is_diag):
