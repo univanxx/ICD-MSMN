@@ -64,7 +64,7 @@ def generate_output_folder_name(args):
     label_lst.append(f'est{args.est_cls}')
         
     if args.term_count > 1:
-        label_lst.extend([args.term_count, args.sort_method])
+        label_lst.extend([args.term_count, args.seed])
         
     loss_lst = [args.loss_name, args.main_code_loss_weight, args.code_loss_weight]
 
@@ -77,7 +77,7 @@ def generate_output_folder_name(args):
     if args.scheduler != "linear":
         train_lst.append(args.scheduler)
                   
-    all_lst = [[args.version], word_lst, combine_lst, decoder_lst, label_lst, loss_lst, train_lst]
+    all_lst = [["mimic4"], word_lst, combine_lst, decoder_lst, label_lst, loss_lst, train_lst]
     folder_name = "_".join(["-".join([str(y) for y in x]) for x in all_lst if x])
     if args.debug:
         folder_name = "debug_" + folder_name

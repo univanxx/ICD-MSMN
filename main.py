@@ -9,9 +9,12 @@ from tqdm import tqdm
 import shutil
 import json
 import ipdb
+
 import sys
+sys.path.append('../../caml-mimic/')
+
 import numpy as np
-from constant import MIMIC_2_DIR, MIMIC_3_DIR
+from constants import MIMIC_4_SAVE_DIR
 from evaluation import all_metrics, print_metrics
 from torch.utils.data import DataLoader
 from train_parser import generate_parser
@@ -39,15 +42,16 @@ def run(args):
     word_embedding_path = args.word_embedding_path         
     accelerator.print(f"Use word embedding from {word_embedding_path}")
     
-    train_dataset = MimicFullDataset(args.version, "train", word_embedding_path, args.truncate_length, args.label_truncate_length, args.term_count, args.sort_method)
-    dev_dataset = MimicFullDataset(args.version, "dev", word_embedding_path, args.truncate_length)
-    test_dataset = MimicFullDataset(args.version, "test", word_embedding_path, args.truncate_length)
-
+    train_dataset = MimicFullDataset("train", word_embedding_path, args.truncate_length, args.label_truncate_length, args.term_count, args.seed)
+    dev_dataset = MimicFullDataset("dev", word_embedding_path, args.truncate_length)
+    test_dataset = MimicFullDataset("test", word_embedding_path, args.truncate_length)
+    
     if args.knowledge_distill:
         raise NotImplementedError
         # teacher_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, collate_fn=my_collate_fn, shuffle=False, num_workers=1)
     else:
         train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, collate_fn=my_collate_fn, shuffle=True, num_workers=8, pin_memory=True)
+        
     eval_batch_size = args.eval_batch_size if args.eval_batch_size > 0 else args.batch_size
     dev_dataloader = DataLoader(dev_dataset, batch_size=eval_batch_size, collate_fn=my_collate_fn, shuffle=False, num_workers=8, pin_memory=True)
     test_dataloader = DataLoader(test_dataset, batch_size=eval_batch_size, collate_fn=my_collate_fn, shuffle=False, num_workers=8, pin_memory=True)
