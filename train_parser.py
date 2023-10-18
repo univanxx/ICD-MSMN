@@ -5,8 +5,8 @@ def generate_parser():
     parser = argparse.ArgumentParser()
 
     # input related
-    parser.add_argument("--version", type=str, default="mimic3-50",
-                        choices=["mimic2", "mimic3", "mimic3-50", "mimic4"], help="Dataset version.")
+    # parser.add_argument("--version", type=str, default="mimic3-50",
+    #                     choices=["mimic4"], help="Dataset version.")
     parser.add_argument("--label_truncate_length", type=int, default=30)
     
     parser.add_argument("--n_gpu", type=int, default=1)
@@ -59,8 +59,7 @@ def generate_parser():
     parser.add_argument("--est_cls", type=int, default=0)
     
     parser.add_argument("--term_count", type=int, default=1)
-    parser.add_argument("--sort_method", type=str, default='random',
-                        choices=['max', 'mean', 'random'])
+    parser.add_argument("--seed", type=int, default=42)
     
     # decoder related
     # parser.add_argument("--attention", type=str, choices=["caml", "laat", "average-word", "none", "logsumexp", "multi-head-laat", "multi-head-laat-v2", 

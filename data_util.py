@@ -3,8 +3,12 @@ import gensim
 import torch
 import os
 from torch.utils.data import Dataset
-from constant import MIMIC_4_SAVE_DIR
+
 import sys
+sys.path.append('../caml-mimic/')
+from constants import MIMIC_4_SAVE_DIR
+import random
+
 import numpy as np
 import csv
 from collections import defaultdict
@@ -23,28 +27,21 @@ while True:
         
         
 def create_main_code(ind2c):
-    mc = list(set([c.split('.')[0] for c in set(ind2c.values())]))
+    mc = list(set(ind2c.values()))
     mc.sort()
+    
     ind2mc = {ind:mc for ind, mc in enumerate(mc)}
     mc2ind = {mc:ind for ind, mc in ind2mc.items()}
     return ind2mc, mc2ind
 
 
 class MimicFullDataset(Dataset):
-    def __init__(self, version, mode, vocab_path, truncate_length, 
-                 label_truncate_length=30, term_count=1, sort_method='max'):
-        self.version = version
+    def __init__(self, mode, vocab_path, truncate_length, 
+                 label_truncate_length=30, term_count=1, seed=42):
+
         self.mode = mode
 
-        # if version == 'mimic2':
-        #     raise NotImplementedError
-        # if version in ['mimic3', 'mimic3-50']:
-        #     self.path = os.path.join(MIMIC_3_DIR, f"{version}_{mode}.json")
-        self.path = os.path.join(MIMIC_4_SAVE_DIR, f"{version}_{mode}.json")
-
-        # if version in ['mimic3']:
-        #     self.train_path = os.path.join(MIMIC_3_DIR, "train_full.csv")
-        # if version in ['mimic3-50']:
+        self.path = os.path.join(MIMIC_4_SAVE_DIR, f"{mode}_50.json")
         self.train_path = os.path.join(MIMIC_4_SAVE_DIR, "train_50.csv")
 
         with open(self.path, "r") as f:
@@ -55,10 +52,11 @@ class MimicFullDataset(Dataset):
 
         self.truncate_length = truncate_length
 
-        self.ind2c = load_full_codes(self.train_path, version=version)
-        # self.part_icd_codes = list(self.ind2c.values())
+        self.ind2c = load_full_codes(self.train_path)
+
         self.c2ind = {c: ind for ind, c in self.ind2c.items()}
         self.code_count = len(self.ind2c)
+        
         if mode == "train":
             print(f'Code count: {self.code_count}')
         
@@ -74,9 +72,10 @@ class MimicFullDataset(Dataset):
         
         self.label_truncate_length = label_truncate_length
         self.term_count = term_count
-        self.sort_method = sort_method
+        self.seed = seed
         if self.mode == "train":
             self.prepare_label_feature(self.label_truncate_length)
+             
 
     def check(self, word):
         for ch in word:
@@ -174,18 +173,21 @@ class MimicFullDataset(Dataset):
             desc_list.append(desc)
         return desc_list
     
-    def process_label(self, ind2c, truncate_length, term_count=1, method='max'):
+    def process_label(self, ind2c, truncate_length, term_count=1, seed=42):
         desc_list = self.extract_label_desc(ind2c)
+        
         if term_count == 1:
             c_desc_list = desc_list
         else:
             c_desc_list = []
-            with open(f'./embedding/icd_mimic3_{method}_sort.json', 'r') as f:
+            with open(f'./embedding/icd_names_cleared.json', 'r') as f:
                 icd_syn = ujson.load(f)
             for i in ind2c:
                 code = ind2c[i]
                 tmp_desc = [desc_list[i]]
                 new_terms = icd_syn.get(code, [])
+                random.seed(seed)
+                random.shuffle(new_terms)
                 if len(new_terms) >= term_count - 1:
                     tmp_desc.extend(new_terms[0:term_count - 1])
                 else:
@@ -198,7 +200,7 @@ class MimicFullDataset(Dataset):
             
         c_input_word = []
         c_word_mask = []
-        c_word_sent = []
+        c_word_sent = []     
         
         for i, desc in enumerate(c_desc_list):
             input_word, word_mask, word_sent = self.text2feature(desc, truncate_length=truncate_length)
@@ -214,13 +216,13 @@ class MimicFullDataset(Dataset):
             term_count = self.term_count
         else:
             term_count = 1
-        if hasattr(self, 'sort_method'):
-            sort_method = self.sort_method
+        if hasattr(self, 'seed'):
+            seed = self.seed
         else:
-            sort_method = 'max'
+            seed = 42
         c_input_word, c_word_mask, c_word_sent = self.process_label(self.ind2c, truncate_length,
                                                                     term_count=term_count,
-                                                                    method=sort_method)
+                                                                    seed=seed)
         # mc_input_word, mc_word_mask, mc_word_sent = self.process_label(self.ind2mc, truncate_length)
         self.c_input_word = torch.LongTensor(c_input_word)
         self.c_word_mask = torch.LongTensor(c_word_mask)
@@ -264,7 +266,8 @@ def load_vocab(path):
         if path.endswith('.bin'):
             model = gensim.models.KeyedVectors.load_word2vec_format(
                 path, binary=True)
-        words = list(model.wv.vocab)
+        words = list(model.wv.index_to_key)
+
         del model
 
     # hard code to trim word embedding size
@@ -284,29 +287,14 @@ def load_vocab(path):
     return word2id, id2word
 
 
-def load_full_codes(train_path, version='mimic4'):
+def load_full_codes(train_path):
     """
         Inputs:
             train_path: path to train dataset
-            version: which (MIMIC) dataset
         Outputs:
             code lookup, description lookup
     """
-    # get description lookup
-    # desc_dict = load_code_descriptions(version=version)
-    # build code lookups from appropriate datasets
-    # if version == 'mimic2':
-    #     ind2c = defaultdict(str)
-    #     codes = set()
-    #     with open('%s/proc_dsums.csv' % MIMIC_2_DIR, 'r') as f:
-    #         r = csv.reader(f)
-    #         # header
-    #         next(r)
-    #         for row in r:
-    #             codes.update(set(row[-1].split(';')))
-    #     codes = set([c for c in codes if c != ''])
-    #     ind2c = defaultdict(str, {i: c for i, c in enumerate(sorted(codes))})
-    # else:
+
     codes = set()
     for split in ['train', 'dev', 'test']:
         with open(train_path.replace('train', split), 'r') as f:
@@ -317,62 +305,55 @@ def load_full_codes(train_path, version='mimic4'):
                     codes.add(code)
     codes = set([c for c in codes if c != ''])
     ind2c = defaultdict(str, {i: c for i, c in enumerate(sorted(codes))})
-    return ind2c #, desc_dict
+    return ind2c
 
 
-def reformat(code, is_diag):
-    """
-        Put a period in the right place because the MIMIC-3 data files exclude them.
-        Generally, procedure codes have dots after the first two digits, 
-        while diagnosis codes have dots after the first three digits.
-    """
-    code = ''.join(code.split('.'))
-    if is_diag:
-        if code.startswith('E'):
-            if len(code) > 4:
-                code = code[:4] + '.' + code[4:]
-        else:
-            if len(code) > 3:
-                code = code[:3] + '.' + code[3:]
-    else:
-        code = code[:2] + '.' + code[2:]
-    return code
+# def reformat(code, is_diag):
+#     """
+#         Put a period in the right place because the MIMIC-3 data files exclude them.
+#         Generally, procedure codes have dots after the first two digits, 
+#         while diagnosis codes have dots after the first three digits.
+#     """
+#     code = ''.join(code.split('.'))
+#     if is_diag:
+#         if code.startswith('E'):
+#             if len(code) > 4:
+#                 code = code[:4] + '.' + code[4:]
+#         else:
+#             if len(code) > 3:
+#                 code = code[:3] + '.' + code[3:]
+#     else:
+#         code = code[:2] + '.' + code[2:]
+#     return code
 
 
 def load_code_descriptions(version='mimic3'):
     # load description lookup from the appropriate data files
     desc_dict = defaultdict(str)
-    if version == 'mimic2':
-        with open('%s/MIMIC_ICD9_mapping' % MIMIC_2_DIR, 'r') as f:
-            r = csv.reader(f)
-            # header
-            next(r)
-            for row in r:
-                desc_dict[str(row[1])] = str(row[2])
-    else:
-        with open("%s/D_ICD_DIAGNOSES.csv" % (DATA_DIR), 'r') as descfile:
-            r = csv.reader(descfile)
-            # header
-            next(r)
-            for row in r:
-                code = row[1]
-                desc = row[-1]
-                desc_dict[reformat(code, True)] = desc
-        with open("%s/D_ICD_PROCEDURES.csv" % (DATA_DIR), 'r') as descfile:
-            r = csv.reader(descfile)
-            # header
-            next(r)
-            for row in r:
-                code = row[1]
-                desc = row[-1]
-                if code not in desc_dict.keys():
-                    desc_dict[reformat(code, False)] = desc
-        with open('%s/ICD9_descriptions' % DATA_DIR, 'r') as labelfile:
-            for _, row in enumerate(labelfile):
-                row = row.rstrip().split()
+
+    with open("%s/d_icd_diagnoses.csv" % (MIMIC_4_SAVE_DIR), 'r') as descfile:
+        r = csv.reader(descfile)
+        # header
+        next(r)
+        for row in r:
+            if row[1] == "10":
                 code = row[0]
+                desc = row[-1]
+                desc_dict[code] = desc
+            else:
+                continue
+    with open("%s/d_icd_procedures.csv" % (MIMIC_4_SAVE_DIR), 'r') as descfile:
+        r = csv.reader(descfile)
+        # header
+        next(r)
+        for row in r:
+            if row[1] == "10":
+                code = row[0]
+                desc = row[-1]
                 if code not in desc_dict.keys():
-                    desc_dict[code] = ' '.join(row[1:])
+                    desc_dict[code] = desc
+            else:
+                continue
     return desc_dict
 
 
@@ -395,15 +376,16 @@ def load_embeddings(embed_file):
         if embed_file.endswith('.bin'):
             model = gensim.models.KeyedVectors.load_word2vec_format(
                 embed_file, binary=True)
-        words = list(model.wv.vocab)
+            
+        words = list(model.wv.index_to_key)
 
         original_word_count = len(words)
 
         # hard code to trim word embedding size
         with open('./embedding/word_count_dict.json', 'r') as f:
             word_count_dict = ujson.load(f)
+        
         words = [w for w in words if w in word_count_dict]
-
         for w in ["**UNK**", "**PAD**", "**MASK**"]:
             if not w in words:
                 words = words + [w]
@@ -412,7 +394,7 @@ def load_embeddings(embed_file):
         new_W = []
         for i in range(len(id2word)):
             if not id2word[i] in ["**UNK**", "**PAD**", "**MASK**"]:
-                new_W.append(model.__getitem__(id2word[i]))
+                new_W.append(model.wv[id2word[i]])
             elif id2word[i] == "**UNK**":
                 print("adding unk embedding")
                 new_W.append(np.random.randn(len(new_W[-1])))
