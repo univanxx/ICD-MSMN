@@ -323,7 +323,7 @@ def load_full_codes(train_path):
 #     return code
 
 
-def load_code_descriptions(version='mimic3'):
+def load_code_descriptions():
     # load description lookup from the appropriate data files
     desc_dict = defaultdict(str)
 
