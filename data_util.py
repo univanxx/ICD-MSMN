@@ -378,7 +378,7 @@ def load_embeddings(embed_file):
         original_word_count = len(words)
 
         # hard code to trim word embedding size
-        with open('./embedding/word_count_dict.json', 'r') as f:
+        with open(os.path.join(MIMIC_4_SAVE_DIR, 'mimic3_embeds/word_count_dict.json'), 'r') as f:
             word_count_dict = ujson.load(f)
         
         words = [w for w in words if w in word_count_dict]
