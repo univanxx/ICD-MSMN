@@ -10,11 +10,8 @@ import shutil
 import json
 import ipdb
 
-import sys
-sys.path.append('../../caml-mimic/')
-
 import numpy as np
-from constants import MIMIC_4_SAVE_DIR
+from constant import MIMIC_4_SAVE_DIR
 from evaluation import all_metrics, print_metrics
 from torch.utils.data import DataLoader
 from train_parser import generate_parser

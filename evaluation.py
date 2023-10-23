@@ -7,10 +7,7 @@ import sys
 from sklearn.metrics import roc_curve, auc
 from tqdm import tqdm
 
-import sys
-sys.path.append('../../caml-mimic/')
-
-from constants import MIMIC_4_SAVE_DIR
+from constant import MIMIC_4_SAVE_DIR
 
 
 def all_metrics(yhat, y, k=[5, 8, 15], yhat_raw=None, calc_auc=True):

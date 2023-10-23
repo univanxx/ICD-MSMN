@@ -5,8 +5,7 @@ import os
 from torch.utils.data import Dataset
 
 import sys
-sys.path.append('../caml-mimic/')
-from constants import MIMIC_4_SAVE_DIR
+from constant import MIMIC_4_SAVE_DIR
 import random
 
 import numpy as np
@@ -271,12 +270,9 @@ def load_vocab(path):
         del model
 
     # hard code to trim word embedding size
-    try:
-        with open('./embedding/word_count_dict.json', 'r') as f:
-            word_count_dict = ujson.load(f)
-    except BaseException:
-        with open('../embedding/word_count_dict.json', 'r') as f:
-            word_count_dict = ujson.load(f)
+    with open(os.path.join(MIMIC_4_SAVE_DIR, 'mimic3_embeds/word_count_dict.json'), 'r') as f:
+        word_count_dict = ujson.load(f)
+
     words = [w for w in words if w in word_count_dict]
 
     for w in ["**UNK**", "**PAD**", "**MASK**"]:
